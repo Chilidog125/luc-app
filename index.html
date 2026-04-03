@@ -1,0 +1,1765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUC Implant Logger</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+<style>
+  :root {
+    --green: #1D9E75;
+    --green-dark: #0F6E56;
+    --green-deep: #085041;
+    --green-light: #E1F5EE;
+    --green-mid: #9FE1CB;
+    --text: #1a1a1a;
+    --text-muted: #6b7280;
+    --text-faint: #9ca3af;
+    --border: #e5e7eb;
+    --border-mid: #d1d5db;
+    --bg: #f9fafb;
+    --bg-card: #ffffff;
+    --bg-input: #ffffff;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    background: var(--green-deep);
+    padding: 0 32px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .topbar-brand { display: flex; align-items: center; gap: 10px; }
+  .topbar-icon {
+    width: 32px; height: 32px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .topbar-icon svg { width: 16px; height: 16px; }
+  .topbar-title { color: white; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .topbar-sub { color: rgba(255,255,255,0.55); font-size: 12px; margin-left: 4px; font-weight: 400; }
+  .topbar-status { display: flex; align-items: center; gap: 6px; }
+  .topbar-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green-mid); }
+  .topbar-status-text { color: rgba(255,255,255,0.7); font-size: 12px; }
+
+  /* ── Layout ── */
+  .page { max-width: 780px; margin: 0 auto; padding: 28px 24px 60px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+  }
+  .card-body { padding: 18px 20px; }
+
+  /* ── Fields ── */
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+  .field input, .field select {
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid var(--border-mid);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+  }
+  .field input:focus, .field select:focus {
+    outline: none;
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(29,158,117,0.12);
+  }
+  .field input[readonly] {
+    background: #f3f4f6;
+    color: var(--text-muted);
+    cursor: default;
+  }
+  .field input.initials { text-transform: uppercase; letter-spacing: 0.12em; font-weight: 500; font-family: 'DM Mono', monospace; }
+
+  /* ── Filename preview ── */
+  .filename-bar {
+    display: flex; align-items: center; gap: 8px;
+    background: #f0faf6;
+    border: 1px solid #b6e8d4;
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    margin-top: 4px;
+  }
+  .filename-bar svg { flex-shrink: 0; color: var(--green); }
+  .filename-bar-text {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--green-dark);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+
+  /* ── Sticker upload ── */
+  .sticker-zone {
+    border: 2px dashed var(--border-mid);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    position: relative;
+  }
+  .sticker-zone:hover { border-color: var(--green); background: #f0faf6; }
+  .sticker-zone.active { border-style: solid; border-color: var(--green); padding: 12px; }
+  .sticker-zone.dragover { border-color: var(--green); background: #d1f5e8; border-style: solid; transform: scale(1.01); transition: all 0.15s; }
+  .sticker-zone-placeholder { pointer-events: none; }
+  .sticker-zone-icon { font-size: 28px; margin-bottom: 6px; opacity: 0.4; }
+  .sticker-zone-text { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+  .sticker-zone-sub { font-size: 11px; color: var(--text-faint); margin-top: 3px; }
+  .sticker-preview { display: none; flex-direction: column; align-items: center; gap: 8px; }
+  .sticker-preview.show { display: flex; }
+  .sticker-preview img { max-height: 72px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+  .sticker-preview-row { display: flex; align-items: center; gap: 8px; }
+
+  /* ── Implant table ── */
+  .implant-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .col-labels {
+    display: grid;
+    grid-template-columns: 1.4fr 0.6fr 1.1fr 1.8fr 0.9fr 28px;
+    gap: 8px;
+    padding: 0 4px;
+    margin-bottom: 4px;
+  }
+  .col-labels span { font-size: 11px; font-weight: 500; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; }
+  .implant-row {
+    display: grid;
+    grid-template-columns: 1.4fr 0.6fr 1.1fr 1.8fr 0.9fr 28px;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .implant-row input {
+    height: 34px;
+    padding: 0 9px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    width: 100%;
+    transition: border-color 0.15s;
+  }
+  .implant-row input:focus { outline: none; border-color: var(--green); }
+  .implant-row input.qty { text-align: center; }
+  .implant-row input.price { text-align: right; }
+  .row-remove {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--border-mid);
+    background: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .row-remove:hover { background: #fef2f2; border-color: #fca5a5; color: #dc2626; }
+  .row-count-bar { font-size: 12px; color: var(--text-faint); margin-top: 6px; text-align: right; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    height: 40px;
+    padding: 0 18px;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--green); color: white; }
+  .btn-primary:hover { background: var(--green-dark); }
+  .btn-secondary { background: white; color: var(--text); border: 1px solid var(--border-mid); }
+  .btn-secondary:hover { background: #f9fafb; }
+  .btn-mycase { background: var(--green-deep); color: white; width: 100%; height: 46px; font-size: 15px; border-radius: var(--radius); }
+  .btn-mycase:hover { background: #043528; }
+  .btn-mycase:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-add { font-size: 12px; color: var(--green); border: 1px solid var(--green-mid); background: var(--green-light); border-radius: var(--radius-sm); padding: 5px 12px; cursor: pointer; font-family: inherit; font-weight: 600; }
+  .btn-add:hover { background: var(--green-mid); }
+
+  /* ── Action bar ── */
+  .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+
+  /* ── Output panels ── */
+  .output-panel { display: none; margin-top: 14px; }
+  .output-panel.show { display: block; }
+  .output-card {
+    background: #f0faf6;
+    border: 1px solid #b6e8d4;
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .output-card-title {
+    font-size: 12px; font-weight: 600; color: var(--green-dark);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .download-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: white; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 10px 14px; gap: 12px;
+  }
+  .download-info strong { display: block; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text); margin-bottom: 2px; word-break: break-all; }
+  .download-info span { font-size: 11px; color: var(--text-muted); }
+  .btn-dl { background: var(--green); color: white; border: none; border-radius: var(--radius-sm); padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .btn-dl:hover { background: var(--green-dark); }
+
+  .portal-list { background: white; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+  .portal-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 12px; border-bottom: 1px solid #f3f4f6; font-size: 13px; }
+  .portal-row:last-child { border-bottom: none; }
+  .portal-label { color: var(--text-muted); font-size: 12px; }
+  .portal-val { font-weight: 500; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--green-dark); }
+  .btn-copy { background: none; border: none; font-size: 12px; color: var(--green); cursor: pointer; font-family: inherit; font-weight: 600; margin-top: 8px; padding: 0; }
+  .btn-copy:hover { text-decoration: underline; }
+
+  /* ── myCASE section ── */
+  .mycase-card {
+    background: linear-gradient(135deg, var(--green-deep) 0%, #0a6b50 100%);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+    color: white;
+  }
+  .mycase-card-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; opacity: 0.9; }
+  .mycase-card-sub { font-size: 12px; opacity: 0.6; margin-bottom: 16px; }
+  .mycase-status { background: rgba(255,255,255,0.1); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 14px; font-size: 12px; color: rgba(255,255,255,0.8); }
+  .mycase-status strong { color: white; display: block; margin-bottom: 2px; font-size: 13px; }
+
+  /* ── Badges ── */
+  .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 100px; }
+  .badge-green { background: var(--green-light); color: var(--green-dark); }
+  .badge-amber { background: #fef3c7; color: #92400e; }
+  .badge-blue { background: #dbeafe; color: #1e40af; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--green-deep); color: white;
+    font-size: 13px; font-weight: 500;
+    padding: 10px 20px; border-radius: 100px;
+    z-index: 9999; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s; white-space: nowrap;
+    box-shadow: var(--shadow-md);
+  }
+  #toast.show { opacity: 1; }
+
+  /* ── Spinner ── */
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.35); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    .two-col, .three-col { grid-template-columns: 1fr; }
+    .col-labels, .implant-row { grid-template-columns: 1.2fr 0.5fr 1fr 28px; }
+    .col-labels span:nth-child(3), .col-labels span:nth-child(4),
+    .implant-row input:nth-child(3), .implant-row input:nth-child(4) { display: none; }
+    .action-grid { grid-template-columns: 1fr; }
+    .page { padding: 16px 14px 60px; }
+    .topbar { padding: 0 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Password screen -->
+<div id="lock-screen" style="position:fixed;inset:0;background:#085041;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0;">
+  <div style="background:white;border-radius:16px;padding:32px 28px;width:min(90vw,360px);box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">
+    <div style="width:52px;height:52px;background:#E1F5EE;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </div>
+    <div style="font-family:'DM Sans',sans-serif;font-size:18px;font-weight:600;color:#111827;margin-bottom:6px;">LUC Implant Logger</div>
+    <div style="font-family:'DM Sans',sans-serif;font-size:13px;color:#6b7280;margin-bottom:22px;">Enter your access code to continue</div>
+    <input id="lock-input" type="password" placeholder="Access code"
+      style="width:100%;height:44px;padding:0 14px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:15px;font-family:'DM Sans',sans-serif;text-align:center;letter-spacing:0.15em;margin-bottom:10px;outline:none;box-sizing:border-box;"
+      onkeydown="if(event.key==='Enter')checkPassword()"
+      oninput="document.getElementById('lock-error').style.display='none';this.style.borderColor='#e5e7eb';"
+    />
+    <div id="lock-error" style="display:none;font-size:12px;color:#dc2626;margin-bottom:10px;font-family:'DM Sans',sans-serif;">Incorrect code — try again</div>
+    <button onclick="checkPassword()"
+      style="width:100%;height:44px;background:#1D9E75;color:white;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;">
+      Unlock
+    </button>
+    <div style="font-size:11px;color:#9ca3af;margin-top:14px;font-family:'DM Sans',sans-serif;">Medtronic · Loaner Usage Confirmation</div>
+  </div>
+</div>
+
+<!-- Top bar -->
+<div class="topbar" id="main-app" style="display:none;">
+  <div class="topbar-brand">
+    <div class="topbar-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/>
+      </svg>
+    </div>
+    <span class="topbar-title">LUC Implant Logger <span class="topbar-sub">· Loaner Usage Confirmation</span></span>
+  </div>
+  <div class="topbar-status">
+    <div class="topbar-dot"></div>
+    <span class="topbar-status-text">Ready</span>
+  </div>
+</div>
+
+<div class="page" id="main-page" style="display:none;">
+
+  <!-- Procedure info -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">Procedure info</span></div>
+    <div class="card-body">
+      <div class="two-col">
+        <div class="field">
+          <label>Customer name</label>
+          <select id="f-hospital" onchange="onHospitalSelect()"><option value="">— Select hospital —</option></select>
+        </div>
+        <div class="field">
+          <label>Customer #</label>
+          <input id="f-custnum" placeholder="Auto-filled" readonly />
+        </div>
+      </div>
+      <div class="field">
+        <label>Surgery #</label>
+        <input id="f-surgnum" placeholder="e.g. SX-2024-001" oninput="updateFilename()" />
+      </div>
+      <div class="two-col">
+        <div class="field">
+          <label>Surgeon</label>
+          <select id="f-surgeon" onchange="updateFilename()"><option value="">— Select surgeon —</option></select>
+        </div>
+        <div class="field">
+          <label>Date of surgery</label>
+          <input id="f-date" placeholder="MM/DD/YYYY" oninput="updateFilename()" />
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="field">
+          <label>Procedure type</label>
+          <select id="f-procedure" onchange="updateFilename()"><option value="">— Select procedure —</option></select>
+        </div>
+        <div class="field">
+          <label>Patient initials</label>
+          <input id="f-initials" class="initials" placeholder="JDS" maxlength="4" oninput="this.value=this.value.toUpperCase();updateFilename()" />
+        </div>
+      </div>
+      <div class="filename-bar">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <div class="filename-bar-text" id="filename-preview">fill fields to preview filename</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Patient sticker + AI extraction -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Patient info sticker</span>
+      <span class="badge badge-blue" style="font-size:10px;">AI reads sticker</span>
+    </div>
+    <div class="card-body">
+      <!-- Upload zone -->
+      <div class="sticker-zone" id="sticker-zone" onclick="onStickerZoneClick(event)">
+        <input type="file" id="sticker-input" accept="image/*" capture="environment" style="display:none" onchange="onStickerUpload(event)" />
+        <input type="file" id="sticker-input-library" accept="image/*,.heic,.heif" style="display:none" onchange="onStickerUpload(event)" />
+        <div class="sticker-zone-placeholder" id="sticker-placeholder">
+          <div class="sticker-zone-icon">🏷</div>
+          <div class="sticker-zone-text">Upload patient sticker</div>
+          <div class="sticker-sub-desktop" id="sticker-sub-desktop">Click or drag · JPG · PNG · HEIF/HEIC</div>
+          <div id="sticker-mobile-btns" style="display:flex;gap:8px;margin-top:10px;justify-content:center;flex-wrap:wrap;">
+            <button onclick="openCamera(event)" style="background:#1D9E75;color:white;border:none;border-radius:7px;padding:8px 14px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">📷 Take photo</button>
+            <button onclick="openLibrary(event)" style="background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;border-radius:7px;padding:8px 14px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">🖼 Choose photo</button>
+          </div>
+        </div>
+        <div class="sticker-preview" id="sticker-preview">
+          <img id="sticker-img" src="" alt="Sticker" />
+          <div class="sticker-preview-row">
+            <span class="badge badge-green" id="sticker-badge">Sticker ready</span>
+            <span style="font-size:12px;color:var(--text-muted);" id="sticker-name"></span>
+            <button onclick="openCropModal(event)" style="font-size:12px;color:#1D9E75;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:600;">✂ Crop</button>
+            <button onclick="removeSticker(event)" style="font-size:12px;color:#dc2626;background:none;border:none;cursor:pointer;font-family:inherit;font-weight:600;">Remove</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI extraction status -->
+      <div id="ai-status" style="display:none;margin-top:12px;">
+        <div id="ai-status-inner" style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);background:#f9fafb;border:1px solid var(--border);border-radius:6px;padding:8px 12px;">
+          <span id="ai-spinner" class="spinner" style="border-color:rgba(0,0,0,0.15);border-top-color:var(--green);width:12px;height:12px;"></span>
+          <span id="ai-status-text">Reading sticker with AI…</span>
+        </div>
+      </div>
+
+      <!-- Extracted patient fields -->
+      <div id="patient-fields" style="display:none;margin-top:14px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+          Patient info <span id="ai-extracted-badge" class="badge badge-green" style="font-size:10px;display:none;">AI extracted ✓</span>
+        </div>
+        <div class="two-col">
+          <div class="field"><label>First name</label><input id="p-first" placeholder="—" /></div>
+          <div class="field"><label>Last name</label><input id="p-last" placeholder="—" /></div>
+        </div>
+        <div class="two-col">
+          <div class="field"><label>Date of birth</label><input id="p-dob" placeholder="MM/DD/YYYY" /></div>
+          <div class="field">
+            <label>Sex</label>
+            <div style="display:flex;align-items:center;gap:16px;height:38px;padding:0 4px;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:400;color:var(--text);cursor:pointer;">
+                <input type="radio" name="p-sex" id="p-sex-m" value="M" style="width:auto;height:auto;" /> Male
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:400;color:var(--text);cursor:pointer;">
+                <input type="radio" name="p-sex" id="p-sex-f" value="F" style="width:auto;height:auto;" /> Female
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="field"><label>FIN / MRN number</label><input id="p-fin" placeholder="—" /></div>
+        <div id="ai-note" style="display:none;font-size:11px;color:var(--text-muted);margin-top:6px;background:#fef3c7;border-radius:5px;padding:6px 10px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Crop modal ── -->
+  <div id="crop-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10000;flex-direction:column;align-items:center;justify-content:center;">
+    <div style="background:#1a1a1a;border-radius:14px;padding:16px;width:min(95vw,560px);display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="color:white;font-weight:600;font-size:15px;">✂ Crop sticker</span>
+        <span style="color:rgba(255,255,255,0.5);font-size:12px;">Drag to move · Handles to resize</span>
+      </div>
+      <!-- Canvas container -->
+      <div style="position:relative;width:100%;background:#000;border-radius:8px;overflow:hidden;touch-action:none;" id="crop-container">
+        <canvas id="crop-canvas" style="display:block;width:100%;cursor:crosshair;touch-action:none;"></canvas>
+        <!-- Crop overlay drawn via JS -->
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="cancelCrop()" style="flex:1;height:42px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:white;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Cancel</button>
+        <button onclick="applyCrop()" style="flex:2;height:42px;border-radius:8px;border:none;background:#1D9E75;color:white;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">✓ Crop &amp; read sticker</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Implants -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Implants used</span>
+      <button class="btn-add" onclick="addRow()">+ Add implant</button>
+    </div>
+    <div class="card-body">
+      <div class="col-labels">
+        <span>Catalog #</span><span>Qty</span><span>Lot #</span><span>Description</span><span>Price ($)</span><span></span>
+      </div>
+      <div id="implant-rows"></div>
+      <div class="row-count-bar" id="row-count"></div>
+    </div>
+  </div>
+
+  <!-- Internal use -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">Internal use</span></div>
+    <div class="card-body">
+      <div class="three-col">
+        <div class="field"><label>PO #</label><input id="f-po" placeholder="" /></div>
+        <div class="field"><label>Billing order #</label><input id="f-billing" placeholder="" /></div>
+        <div class="field">
+          <label>Entered by</label>
+          <select id="f-enteredby"><option value="">— Select name —</option></select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save & Email / Load from Email -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Transfer case</span>
+      <span class="badge badge-green" style="font-size:10px;">iPhone ↔ Laptop</span>
+    </div>
+    <div class="card-body">
+      <!-- Save & email -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">
+          Filled in on your iPhone? Email yourself the case data to continue on your laptop.
+        </div>
+        <div class="field" style="margin-bottom:10px;">
+          <label>Your email address</label>
+          <input id="transfer-email" type="email" placeholder="clayross100@gmail.com" value="clayross100@gmail.com" />
+        </div>
+        <button class="btn btn-primary" style="width:100%;" onclick="saveAndEmail()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
+          Save &amp; email to laptop
+        </button>
+      </div>
+      <div class="divider" style="height:1px;background:var(--border);margin:14px 0;"></div>
+      <!-- Load from email -->
+      <div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;line-height:1.5;">
+          Received a case email on your laptop? Paste the case code below to load it.
+        </div>
+        <div class="field" style="margin-bottom:10px;">
+          <label>Case code (from email)</label>
+          <textarea id="transfer-paste" placeholder="Paste case code here…" style="width:100%;height:70px;padding:8px 10px;border:1px solid var(--border-mid);border-radius:var(--radius-sm);font-family:'DM Mono',monospace;font-size:11px;resize:vertical;background:var(--bg-input);color:var(--text);"></textarea>
+        </div>
+        <button class="btn btn-secondary" style="width:100%;" onclick="loadFromCode()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Load case data
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="mycase-card">
+    <div class="mycase-card-title">myCASE Bridge</div>
+    <div class="mycase-card-sub">Send implant data directly to Medtronic myCASE portal</div>
+    <div class="mycase-status" id="mycase-status">
+      <strong id="mycase-status-title">Extension status</strong>
+      <span id="mycase-status-text">Checking for LUC Bridge extension…</span>
+    </div>
+    <button class="btn btn-mycase" id="btn-send-mycase" onclick="sendToMyCASE()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      Send to myCASE
+    </button>
+  </div>
+
+  <!-- Action buttons -->
+  <div class="action-grid">
+    <button class="btn btn-secondary" onclick="showPortal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      Portal summary
+    </button>
+    <button class="btn btn-primary" onclick="generateLUC()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download LUC
+    </button>
+  </div>
+
+  <!-- Output: LUC download -->
+  <div class="output-panel" id="output-luc">
+    <div class="output-card">
+      <div class="output-card-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        LUC Excel file ready
+        <span class="badge badge-green">Your template</span>
+      </div>
+      <div class="download-row">
+        <div class="download-info">
+          <strong id="dl-filename">—</strong>
+          <span>Open in Excel · save as PDF · email to billing</span>
+        </div>
+        <button class="btn-dl" id="dl-btn">Download</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Output: Portal summary -->
+  <div class="output-panel" id="output-portal">
+    <div class="output-card">
+      <div class="output-card-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        Portal entry summary
+        <span class="badge badge-blue">Copy &amp; paste</span>
+      </div>
+      <div class="portal-list" id="portal-content"></div>
+      <button class="btn-copy" onclick="copyPortal()">Copy all to clipboard</button>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<div id="toast"></div>
+
+<script>
+// ── Access code ───────────────────────────────────────────────────────────────
+// Change LUCACCESS to whatever password you want
+const ACCESS_CODE = 'LUC4321';
+
+function checkPassword() {
+  const input = document.getElementById('lock-input').value.trim();
+  if (input === ACCESS_CODE) {
+    sessionStorage.setItem('luc_unlocked', '1');
+    document.getElementById('lock-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = '';
+    document.getElementById('main-page').style.display = '';
+  } else {
+    const err = document.getElementById('lock-error');
+    const inp = document.getElementById('lock-input');
+    err.style.display = 'block';
+    inp.style.borderColor = '#dc2626';
+    inp.value = '';
+    inp.focus();
+  }
+}
+
+// Auto-unlock if already authenticated this session
+(function() {
+  if (sessionStorage.getItem('luc_unlocked') === '1') {
+    document.getElementById('lock-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = '';
+    document.getElementById('main-page').style.display = '';
+  } else {
+    setTimeout(() => document.getElementById('lock-input').focus(), 300);
+  }
+})();
+
+// ── API Configuration ─────────────────────────────────────────────────────────
+// API key is stored securely in Netlify environment variables — no key needed here.
+
+// ── Data ──────────────────────────────────────────────────────────────────────
+
+const HOSPITALS = [
+  {name:'Armenia Surg Ctr',num:'1834236'},{name:'Bio-Spine',num:'1371263'},
+  {name:'St. Joseph',num:'1106280'},{name:'Lakeland Regional',num:'1106676'},
+  {name:'Brandon',num:'1107046'},{name:'AH Carrollwood',num:'1107680'},
+  {name:'AH Tampa',num:'1107728'},{name:'S. FL Baptist',num:'1141967'},
+  {name:'Tampa General',num:'1107012'},{name:'South Shore',num:'1108201'},
+  {name:'James Haley VA',num:'1107310'},{name:'Shriners',num:'1109604'},
+  {name:'D1 Surgery Ctr',num:'1410675'},{name:'Tampa Community',num:'1152519'},
+  {name:'St. Joseph S',num:'1398833'},{name:'Moffitt McKinley',num:'2110369'},
+  {name:'TMIS',num:'1275100'},{name:'Winter Haven',num:'1108429'},
+  {name:'Tampa Outpatient SC',num:'1150128'},{name:'Westchase SC',num:'1259369'},
+  {name:'Habana SC',num:'1498348'},{name:'Wesley Chapel',num:'1328549'},
+  {name:'St Joseph N',num:'1233517'},{name:'HCA South Tampa',num:'1107411'},
+  {name:'Trinity',num:'1302931'},{name:'COJ&S',num:'2004643'},
+  {name:'AH Zephyrhills',num:'1133390'},{name:'OMG SC',num:'2105650'},
+  {name:'FOI SC Gunn Hwy',num:'1576780'},{name:'Spine Inst of Ctrl FL',num:'2179604'},
+  {name:'Bayonet Point',num:'1108124'},
+];
+
+const PROCEDURES = [
+  'ACDF','ADOLESCENT IDIOPATHIC SCOLIOSIS','ADULT SPINAL DEFORMITY','ALIF',
+  'CERVICAL DISC ARTHROPLASTY','Cervical Other','CERVICAL PLATING',
+  'DEGENERATIVE LUMBAR FUSION','DLIF','EARLY ONSET SCOLIOSIS','IPD','Kyphoplasty',
+  'LAMINOPLASTY','MIS POSTERIOR 1-3 LEVELS','MIS POSTERIOR 4+ LEVELS','MLIF','OLIF',
+  'OLIF SPS (Single Position Surgery)','OTHER PEDIATRIC SCOLIOSIS',
+  'Other Thoracic or Lumbar Procedure','PILAR PCF','Posterior Cervical Fusion',
+  'Prone Lateral','RE-OPERATION','SI Fusion','Thoracic or Lumbar Corpectomy',
+  'TL REVISION - ADD-ON','TL REVISION - REMOVE AND REPLACE','TL Trauma','TL Tumor',
+  'TLIF/PLIF','Vertebroplasty',
+];
+
+const REPS = ['Clayton Ross','Brian Smith','Billy Hess','George Acosta','Elijah Baptiste'];
+
+const SURGEONS = [
+  {name:'Aaron Smith',npi:'1659582005'},{name:'Adam Morris',npi:'1487053880'},
+  {name:'Adam Ward',npi:'1730676339'},{name:'Adil Samad',npi:'1538468160'},
+  {name:'Adnan Arslanagic',npi:'1154363729'},{name:'Adolph Flowers',npi:'1053637447'},
+  {name:'Adrian Kochno',npi:'1871080416'},{name:'Agustin Ancaya',npi:'1871507368'},
+  {name:'Ahmad Faheem',npi:'1174085740'},{name:'Ahmed Alhassani',npi:'1376163733'},
+  {name:'Ahmed Anwer Mohamed',npi:'1437591591'},{name:'Ahmed Mohamed',npi:'1770902843'},
+  {name:'Aisha Aman',npi:'1780902817'},{name:'Ajibola Loye',npi:'1770557977'},
+  {name:'Ajoy Kotwal',npi:'1811919657'},{name:'Akhtar Khan',npi:'1447217492'},
+  {name:'Ala Abuaita',npi:'1538506670'},{name:'Alberto Torres',npi:'1427636810'},
+  {name:'Aleixo Viegas',npi:'1730149279'},{name:'Alex Mierke',npi:'1902339344'},
+  {name:'Alexander Gutierrez',npi:'1861922981'},{name:'Alexander Haas',npi:'1760725881'},
+  {name:'Alexander Webb',npi:'1134616253'},{name:'Alexandra Lteif',npi:'1669009783'},
+  {name:'Alfiya Gabidullina',npi:'1457766115'},{name:'Alfred Bonati',npi:'1457469660'},
+  {name:'Ali Jaffar',npi:'1265486476'},{name:'Alison Hemsley',npi:'1366903064'},
+  {name:'Allison Hales',npi:'1841648326'},{name:'Amarilis Perez',npi:'1558503722'},
+  {name:'Amina Lleshi',npi:'1164050829'},{name:'Amir Ahmadian',npi:'1073789335'},
+  {name:'Amir Feghhi',npi:'1154435014'},{name:'Ammar Jesri',npi:'1801965785'},
+  {name:'Amr Abouzied',npi:'1295782084'},{name:'Anabelen Rivera De Rosales',npi:'1871784991'},
+  {name:'Anand Nayee',npi:'1760633390'},{name:'Andre Beer Furlan',npi:'1669857199'},
+  {name:'Andrea Morgan-Bedasse',npi:'1982804233'},{name:'Andrew Gaugler',npi:'1164651337'},
+  {name:'Andrew Niclosi',npi:'1902366735'},{name:'Angel Docobo',npi:'1831281864'},
+  {name:'Angela Digamon',npi:'1558895045'},{name:'Anibal Cuevas',npi:'1881660587'},
+  {name:'Anil Bhatia',npi:'1457375479'},{name:'Anjan Shah',npi:'1104091933'},
+  {name:'Anna Schepcoff',npi:'1962932475'},{name:'Anthony Florschutz',npi:'1801024823'},
+  {name:'Antonio Wong',npi:'1265405476'},{name:'Antony Nguyen',npi:'1518385798'},
+  {name:'Anurag Tiwary',npi:'1164404620'},{name:'Arash Pasha',npi:'1780828095'},
+  {name:'Arch Amon',npi:'1447527346'},{name:'Armen Deukmedjian',npi:'1760670889'},
+  {name:'Arsen Tan',npi:'1295311934'},{name:'Asim Pathan',npi:'1447403746'},
+  {name:'Assem Sherieh',npi:'1356517395'},{name:'Aysha Ahmed',npi:'1346699287'},
+  {name:'Babatunde Akinsete',npi:'1508050618'},{name:'Bhavik Vala',npi:'1104075316'},
+  {name:'Bina Patel',npi:'1447564562'},{name:'Bracken Armstrong',npi:'1730488396'},
+  {name:'Brandon Chircop',npi:'1033679402'},{name:'Brendan Malik',npi:'1023384930'},
+  {name:'Brett Menmuir',npi:'1639150204'},{name:'Brian Hudson',npi:'1669784724'},
+  {name:'Brooks Osburn',npi:'1932527298'},{name:'Burhaan Ahmad',npi:'1730137118'},
+  {name:'Butros Bazo',npi:'1144414673'},{name:'Calvin Briles',npi:'1053603878'},
+  {name:'Cameron Esmkhani',npi:'1396922415'},{name:'Camille Alfonso',npi:'1912312794'},
+  {name:'Carlos Santos De Jesus',npi:'1912212119'},{name:'Carly Rabinowitz',npi:'1487114708'},
+  {name:'Carmen Nan',npi:'1912943424'},{name:'Chadi Alkhalil',npi:'1245282110'},
+  {name:'Charles Davis',npi:'1083758536'},{name:'Charles Edwards',npi:'1871502690'},
+  {name:'Christopher Bingham',npi:'1053506931'},{name:'Christopher Comey',npi:'1689756447'},
+  {name:'Christopher Flanagan',npi:'1841686771'},{name:'Chukwudumebi Uche',npi:'1649859836'},
+  {name:'Chukwuka Okafor',npi:'1699979534'},{name:'Clayton Bauer',npi:'1639564842'},
+  {name:'Daniel Jurusz',npi:'1275628059'},{name:'Daniel Segarra',npi:'1255913869'},
+  {name:'David Franco',npi:'1831460989'},{name:'David Panczykowski',npi:'1699062596'},
+  {name:'David Siambanes',npi:'1568424075'},{name:'David Wasef',npi:'1790366326'},
+  {name:'David Watson',npi:'1992779474'},{name:'Davide Croci',npi:'1699392738'},
+  {name:'Dayaker Kokku',npi:'1962773630'},{name:'Dean Goldberg',npi:'1437148368'},
+  {name:'Deborah Dewaay',npi:'1508953480'},{name:'Debra Seoane',npi:'1619962289'},
+  {name:'Dejan Slavnic',npi:'1629451901'},{name:'Derek Gonzalez',npi:'1235661158'},
+  {name:'Desiree Ortiz',npi:'1871171116'},{name:'Devang Jani',npi:'1841723939'},
+  {name:'Dipanita Barua',npi:'1376840157'},{name:'Donald Sachs',npi:'1609081900'},
+  {name:'Donald Smith',npi:'1568481802'},{name:'Donald Straub',npi:'1306957816'},
+  {name:'Donnell Mcdonald',npi:'1548721913'},{name:'Douglas Schwartz',npi:'1639312036'},
+  {name:'Drew Rideout',npi:'1740472398'},{name:'Eduardo Nogales',npi:'1669092912'},
+  {name:'Edward Amoah',npi:'1336101450'},{name:'Edwin Lopez-Chaves',npi:'1952596520'},
+  {name:'Ekram Jahanzaib',npi:'1477042687'},{name:'Elan Jeremitsky',npi:'1821050113'},
+  {name:'Elie Fegahli',npi:'1013545300'},{name:'Elizabeth Pacer',npi:'1992332993'},
+  {name:'Eric Sincoff',npi:'1275563918'},{name:'Erik Hayman',npi:'1699041806'},
+  {name:'Erika Van Doorn',npi:'1093046773'},{name:'Erwing Parra De Jesus',npi:'1669657409'},
+  {name:'Eugenia Glaros',npi:'1629403126'},{name:'Evan Lindbergh',npi:'1386173102'},
+  {name:'Fahmida Keya',npi:'1215224316'},{name:'Firas Alzaiem',npi:'1043714470'},
+  {name:'Francia Guerrero',npi:'1023285095'},{name:'Francis Labarbera',npi:'1396090338'},
+  {name:'Frank Bono',npi:'1124094966'},{name:'Frederick Moore',npi:'1497800403'},
+  {name:'Gabriel Flores-Milan',npi:'1750764106'},{name:'Gabriel Gonzales-Portillo',npi:'1811992357'},
+  {name:'Geoffrey Cronen',npi:'1124059332'},{name:'Geoffrey Douglas',npi:'1346456399'},
+  {name:'George Giannakopoulos',npi:'1932137650'},{name:'Gerald Curley',npi:'1417919754'},
+  {name:'Grant Geissler',npi:'1376725101'},{name:'Gregory Cumberbatch',npi:'1952552945'},
+  {name:'Guillermo Vasquez',npi:'1093788499'},{name:'Halima Ghafoor',npi:'1336354398'},
+  {name:'Haoming Pang',npi:'1073967188'},{name:'Harish Madnani',npi:'1437182524'},
+  {name:'Hassan Mir',npi:'1467675710'},{name:'Hazem Abugrara',npi:'1083905640'},
+  {name:'Heather Wortham',npi:'1356701189'},{name:'Henry Chang',npi:'1962517219'},
+  {name:'Hexuan Ren',npi:'1669413068'},{name:'Hien Mai',npi:'1881029205'},
+  {name:'Hiren Parikh',npi:'1104874395'},{name:"Holly O'Brien",npi:'1023540184'},
+  {name:'Hongxen Hollister',npi:'1841583754'},{name:'Humayun Mian',npi:'1255372611'},
+  {name:'Ian Musgrave',npi:'1750548681'},{name:'Ibrahim Elkhayat',npi:'1215909635'},
+  {name:'Ibrahim Saad',npi:'1508121633'},{name:'I-Chi Liang',npi:'1588104806'},
+  {name:'Ihtasham Habib',npi:'1932374469'},{name:'Irene Muratides',npi:'1205396710'},
+  {name:'Jacqueline Wesolow',npi:'1649684093'},{name:'James Abraham',npi:'1467421735'},
+  {name:'James Billys',npi:'1831164870'},{name:'James Follett',npi:'1780973933'},
+  {name:'James Liu',npi:'1033386909'},{name:'James Ronzo',npi:'1801852272'},
+  {name:'James St Louis',npi:'1467406215'},{name:'James Vernace',npi:'1184121063'},
+  {name:'Jayson Sack',npi:'1467687434'},{name:'Jeffrey Bulson',npi:'1114487493'},
+  {name:'Jenna Donoso',npi:'1033485131'},{name:'Jennifer Foster',npi:'1932726932'},
+  {name:'Jennifer Glover',npi:'1376563742'},{name:'Jennifer Ting',npi:'1922276153'},
+  {name:'Jeralyn Allen',npi:'1063669125'},{name:'Jermaine Ekobena',npi:'1689191678'},
+  {name:'Jesse Suarez',npi:'1740637768'},{name:'Jessica Glover',npi:'1013447408'},
+  {name:'Joanna Barris',npi:'1083930655'},{name:'Johanna Henriquez',npi:'1700047214'},
+  {name:'John Amann',npi:'1104870088'},{name:'John Cha',npi:'1861433518'},
+  {name:'John Doehring',npi:'1306223698'},{name:'John Gachiani',npi:'1619167954'},
+  {name:'John Hanna',npi:'1548765464'},{name:'John Small',npi:'1144227364'},
+  {name:'John Soliman',npi:'1093044216'},{name:'Jolian Rios',npi:'1831455773'},
+  {name:'Jonathon Yoder',npi:'1528520566'},{name:'Jorge Esquivel',npi:'1942212402'},
+  {name:'Jorge Inga',npi:'1326124231'},{name:'Jorge Perez Polanco',npi:'1538158761'},
+  {name:'Jose Concepcion Ramirez',npi:'1265700108'},{name:'Jose Diaz',npi:'1144304262'},
+  {name:'Jose Medina-Sanchez',npi:'1619121324'},{name:'Jose Torres Gluck',npi:'1215048517'},
+  {name:'Joseph Carlucci',npi:'1578569992'},{name:'Joseph Dulaney',npi:'1356733018'},
+  {name:'Joseph Granite',npi:'1861980179'},{name:'Joseph Love',npi:'1518196898'},
+  {name:'Joseph Zavatsky',npi:'1619184371'},{name:'Joshua Digregorio',npi:'1386107233'},
+  {name:'Juan Angel',npi:'1336183748'},{name:'Juan Valdivia Valdivia',npi:'1043413412'},
+  {name:'Jugraj Dhanoa',npi:'1861870412'},{name:'Justin Deptula',npi:'1386094910'},
+  {name:'Kain Lentine',npi:'1326677766'},{name:'Kalaveshi Sokol',npi:'1699209882'},
+  {name:'Kalpesh Patel',npi:'1093733867'},{name:'Kapilkumar Patel',npi:'1356416531'},
+  {name:'Karon Locicero',npi:'1255307641'},{name:'Kerrie Fearon Pounall',npi:'1598201931'},
+  {name:'Kevin Dunne',npi:'1306238936'},{name:'Kevin Sierra',npi:'1659318913'},
+  {name:'Khayam Shaukat',npi:'1639117120'},{name:'Khizzar Shaukat',npi:'1215972161'},
+  {name:'Kimberly Abdelkader',npi:'1609262062'},{name:'Kiran To',npi:'1497021893'},
+  {name:'Korey Yngstrom',npi:'1316333537'},{name:'Krishna Tewari',npi:'1871788745'},
+  {name:'Kyle Maung',npi:'1336256379'},{name:'Lalkrushna Malaviya',npi:'1134394356'},
+  {name:'Lanee Riley',npi:'1114367539'},{name:'Laura Fox',npi:'1326383233'},
+  {name:'Laura Mones',npi:'1134514094'},{name:'Lauren Kuykendall',npi:'1174899470'},
+  {name:'Lawanya Jeyaselvan',npi:'1871098426'},{name:'Lidia Sepulveda Rubiera',npi:'1457643462'},
+  {name:'Lindsey Sperry',npi:'1700228921'},{name:'Lisardo Lamelas',npi:'1659315075'},
+  {name:'Lucy Love',npi:'1972634111'},{name:'Luis Mejia Garcia',npi:'1699270801'},
+  {name:'Luis Melendez-Collazo',npi:'1760455190'},{name:'Luis Silva',npi:'1427231497'},
+  {name:'Mahad Mohammed',npi:'1932561305'},{name:'Manuel Lopez',npi:'1023093671'},
+  {name:'Marc Copeland',npi:'1700056769'},{name:'Marc Weinstein',npi:'1679570469'},
+  {name:'Marek Krysztofiak',npi:'1174774426'},{name:'Mari Tofani',npi:'1710958541'},
+  {name:'Mariam Abreu Ruiz',npi:'1740472695'},{name:'Marina Karadayi',npi:'1194150698'},
+  {name:'Mario Hernandez Mendez',npi:'1023258373'},{name:'Mario Talanga',npi:'1144717943'},
+  {name:'Mark Glickfeld',npi:'1710909833'},{name:'Mark Greenberg',npi:'1205855533'},
+  {name:'Mark Ledbetter',npi:'1245764844'},{name:'Mark Perenich',npi:'1497060487'},
+  {name:'Martin Giangreco',npi:'1548535701'},{name:'Martin Walsh',npi:'1255968475'},
+  {name:'Maruthsakhi Molugu',npi:'1285193128'},{name:'Masood Khan',npi:'1588687248'},
+  {name:'Matthew Baron',npi:'1730573890'},{name:'Matthew Darlow',npi:'1467913970'},
+  {name:'Matthew Forestiere',npi:'1497013312'},{name:'Matthew Hartlage',npi:'1912192592'},
+  {name:'Mauricio Montana-Hernandez',npi:'1144239187'},{name:'Mazhar Shah',npi:'1558653238'},
+  {name:'Megan Spencer',npi:'1750607305'},{name:'Mehul Patel',npi:'1346504123'},
+  {name:'Michael Campanelli',npi:'1710931662'},{name:'Michael Roberts',npi:'1316350200'},
+  {name:'Michael Roberts',npi:'1720307481'},{name:'Michael Shehata',npi:'1396162426'},
+  {name:'Michael Taylor',npi:'1629465752'},{name:'Michael Thompson',npi:'1134217045'},
+  {name:'Michael Walters',npi:'1487752796'},{name:'Miguel Davila',npi:'1376958504'},
+  {name:'Milad Behbahaninia',npi:'1568874071'},{name:'Milan Mathew',npi:'1881700284'},
+  {name:'Milin Patel',npi:'1720421126'},{name:'Milton Brown',npi:'1275695306'},
+  {name:'Minal Ahson',npi:'1124345749'},{name:'Mirza Mughal',npi:'1811254410'},
+  {name:'Misbahuddin Syed',npi:'1962848994'},{name:'Mladen Grigorov',npi:'1336609403'},
+  {name:'Mohamed Saleh',npi:'1043638547'},{name:'Mohammad Munir',npi:'1023080363'},
+  {name:'Mounica Banala',npi:'1457746117'},{name:'Muhammad Ghabra',npi:'1851604250'},
+  {name:'Muhammad Mustafa',npi:'1124039284'},{name:'Mukeshkumar Patel',npi:'1508006610'},
+  {name:'Nadia Eid',npi:'1932580958'},{name:'Nalini Patel',npi:'1306873153'},
+  {name:'Nam Tran',npi:'1134338569'},{name:'Natalie Guerrini',npi:'1669879466'},
+  {name:'Nauman Chaudhry',npi:'1710305495'},{name:'Neelima Zureikat',npi:'1942430236'},
+  {name:'Neeti Pradeep',npi:'1437507696'},{name:'Nelson Lezcano',npi:'1578874483'},
+  {name:'Nicholas Mavromates',npi:'1376048660'},{name:'Nicholas Strobbe',npi:'1679808612'},
+  {name:'Nigel Lewis',npi:'1790096964'},{name:'Nikesh Kapadia',npi:'1699194498'},
+  {name:'Nikhil Bhatia',npi:'1275039042'},{name:'Nilo Ayuyao',npi:'1821167834'},
+  {name:'Nimesh Panchigar',npi:'1346279148'},{name:'Niraj Jani',npi:'1558604371'},
+  {name:'Nirav Patel',npi:'1598050486'},{name:'Nishit Jailwala',npi:'1508251315'},
+  {name:'Odette Mercado-Chebly',npi:'1689647083'},{name:'Oliver Fowler',npi:'1538656095'},
+  {name:'Olivia Pop',npi:'1700013034'},{name:'Olumide Sobowale',npi:'1508851197'},
+  {name:'Omar Cardenas',npi:'1093763690'},{name:'Pankaj Patel',npi:'1558311316'},
+  {name:'Parul Singh',npi:'1902289291'},{name:'Patrick Gonzalez',npi:'1548278856'},
+  {name:'Patrick Kim',npi:'1922482322'},{name:'Paul Mcbride',npi:'1730541806'},
+  {name:'Paul Ott',npi:'1417440702'},{name:'Paula Charugundla',npi:'1588221972'},
+  {name:'Peter Kazmier',npi:'1811964273'},{name:'Philip Atigre',npi:'1871550483'},
+  {name:'Philip Henkin',npi:'1972522191'},{name:'Philip Jones',npi:'1851542922'},
+  {name:'Pornchai Kittivarakarn',npi:'1427436385'},{name:'Pragnesh Shah',npi:'1780786236'},
+  {name:'Pratick Patel',npi:'1700311990'},{name:'Priya Sequeira',npi:'1578025987'},
+  {name:'Puya Alikhani',npi:'1598992505'},{name:'Rabia Shaikh',npi:'1912906074'},
+  {name:'Radhika Menon',npi:'1487633640'},{name:'Rafael Rodriguez',npi:'1720059868'},
+  {name:'Raidel Crespo',npi:'1770829574'},{name:'Raja Gummalla',npi:'1952618951'},
+  {name:'Rajan Garg',npi:'1780930388'},{name:'Rakesh Kumar',npi:'1962496133'},
+  {name:'Ramamahesh Seeni',npi:'1902435704'},{name:'Rameez Ahmad',npi:'1588011852'},
+  {name:'Ramon Docobo',npi:'1881041226'},{name:'Raquel Weston',npi:'1215370903'},
+  {name:'Raul Olivera',npi:'1982872057'},{name:'Rene Cajuste',npi:'1811962467'},
+  {name:'Riaz Baba',npi:'1841570173'},{name:'Richard Hodges',npi:'1184629412'},
+  {name:'Richard Sontchi',npi:'1225287923'},{name:'Rishu Batra',npi:'1427670900'},
+  {name:'Robert Ledford',npi:'1548422983'},{name:'Robert Mccormick',npi:'1962761577'},
+  {name:'Robert Ringersen',npi:'1679004600'},{name:'Rohit Vasan',npi:'1083893010'},
+  {name:'Ron Mathew',npi:'1326207382'},{name:'Rushabh Vakharia',npi:'1568801777'},
+  {name:'Ryan Brink',npi:'1861925521'},{name:'Ryan Hoecker',npi:'1164782090'},
+  {name:'Ryan Van Rensburg',npi:'1902434194'},{name:'Sai Oruganti',npi:'1184917098'},
+  {name:'Sai Wan',npi:'1881942977'},{name:'Said Awad',npi:'1629465075'},
+  {name:'Saif Abdullah',npi:'1255503033'},{name:'Salman Ahmed',npi:'1174709968'},
+  {name:'Sampada Roy',npi:'1780844498'},{name:'Samuel Joseph',npi:'1336330778'},
+  {name:'Sana Hussain',npi:'1235546078'},{name:'Sandra Farach',npi:'1316262884'},
+  {name:'Sanjay Hegde',npi:'1942469317'},{name:'Sanjiv Gray',npi:'1992930499'},
+  {name:'Sapna Patel',npi:'1598924540'},{name:'Sarah Gaugler',npi:'1528370848'},
+  {name:'Sarah Santana Jimenez',npi:'1679703359'},{name:'Sarbagya Pandit',npi:'1457703878'},
+  {name:'Saritha Kadari',npi:'1760046171'},{name:'Saurabh Mohanachandran',npi:'1528528684'},
+  {name:'Scott Cutler',npi:'1689728289'},{name:'Scott Kramer',npi:'1770157281'},
+  {name:'Scott Lentz',npi:'1063663417'},{name:'Sean Kelly',npi:'1700205952'},
+  {name:'Shabaz Bhalwani',npi:'1215432117'},{name:'Shahid Sulaiman',npi:'1730462284'},
+  {name:'Shaival Thakore',npi:'1164610812'},{name:'Shakib Khan',npi:'1821256132'},
+  {name:'Sharif-Uz-Zaman Khan',npi:'1508193715'},{name:'Shashank Mishra',npi:'1558658575'},
+  {name:'Shenelle-Marie Wise',npi:'1669739355'},{name:'Shweta Ekka',npi:'1720264575'},
+  {name:'Sinan Abdul-Wahab',npi:'1679033385'},{name:'Somasekhara Kaipu',npi:'1710153481'},
+  {name:'Sridevi Manginani',npi:'1609156975'},{name:'Sriprintha Navarathinarajah',npi:'1003802554'},
+  {name:'Stephanie Willis',npi:'1093198368'},{name:'Stephen Rowe',npi:'1518991876'},
+  {name:'Steven Lorch',npi:'1811286982'},{name:'Steven Tresser',npi:'1457309056'},
+  {name:'Sunil Medidi',npi:'1427324607'},{name:'Syed Ali',npi:'1649843871'},
+  {name:'Syed Umair',npi:'1639374085'},{name:'Syed Zaidi',npi:'1003213604'},
+  {name:'Tejaswita Katta',npi:'1689163644'},{name:'Tereese Allen',npi:'1538264551'},
+  {name:'Thaung Myint',npi:'1154628238'},{name:'Thomas Abbruzzese',npi:'1689710279'},
+  {name:'Thomas Freeman',npi:'1962421297'},{name:'Thomas Herron',npi:'1013237007'},
+  {name:'Thomas Stang',npi:'1891185963'},{name:'Thuy Nguyen',npi:'1164702585'},
+  {name:'Tien Le',npi:'1316136377'},{name:'Tilisha Patel',npi:'1558821207'},
+  {name:'Travis Dailey',npi:'1629462734'},{name:'Trisha Saha',npi:'1396192514'},
+  {name:'Urvish Patel',npi:'1336636224'},{name:'Vasilios Lambrinos',npi:'1598960551'},
+  {name:'Veena Lingam',npi:'1346483690'},{name:'Venkata Bireddy',npi:'1891815387'},
+  {name:'Vito Lazo',npi:'1245277649'},{name:'Wael Hijaz',npi:'1285160564'},
+  {name:'Walid Moughabel',npi:'1356927792'},{name:'Ward Wall',npi:'1437145083'},
+  {name:'William Costello',npi:'1821625542'},{name:'William Mcgrogan',npi:'1093820334'},
+  {name:'William Tontz',npi:'1659332682'},{name:'Yarema Bezchlibnyk',npi:'1740644830'},
+  {name:'Yasmin Mahmoud',npi:'1407111537'},{name:'Yasmine Ibrahim',npi:'1487069506'},
+  {name:'Yeshitila Agzew',npi:'1801813829'},{name:'Yilmarie Rosado-Acevedo',npi:'1376906453'},
+  {name:'Yunxiang Zhao',npi:'1437492683'},{name:'Zaheer Zarmeen',npi:'1851917355'},
+  {name:'Zoltan Bereczki',npi:'1831199983'},
+];
+
+// ── Init dropdowns ─────────────────────────────────────────────────────────
+
+(function initDropdowns() {
+  const hospSel = document.getElementById('f-hospital');
+  [...HOSPITALS].sort((a,b)=>a.name.localeCompare(b.name)).forEach(h=>{
+    const o=document.createElement('option'); o.value=h.num; o.textContent=h.name; hospSel.appendChild(o);
+  });
+  const procSel = document.getElementById('f-procedure');
+  PROCEDURES.forEach(p=>{ const o=document.createElement('option'); o.value=p; o.textContent=p; procSel.appendChild(o); });
+  const repSel = document.getElementById('f-enteredby');
+  REPS.forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; repSel.appendChild(o); });
+  const surgSel = document.getElementById('f-surgeon');
+  SURGEONS.sort((a,b)=>a.name.localeCompare(b.name)).forEach(s=>{
+    const o=document.createElement('option');
+    o.value=s.name;
+    o.textContent=`${s.name} (${s.npi})`;
+    surgSel.appendChild(o);
+  });
+
+  // Today's date
+  const now = new Date();
+  document.getElementById('f-date').value =
+    `${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}/${now.getFullYear()}`;
+
+  addRow('','1','','','');
+  addRow('','1','','','');
+  updateCount();
+  updateFilename();
+  checkExtension();
+})();
+
+// ── Drag and drop for sticker zone ────────────────────────────────────────
+
+(function initDragDrop() {
+  const zone = document.getElementById('sticker-zone');
+
+  zone.addEventListener('dragenter', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    zone.classList.add('dragover');
+  });
+
+  zone.addEventListener('dragover', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+    zone.classList.add('dragover');
+  });
+
+  zone.addEventListener('dragleave', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    // Only remove if leaving the zone entirely (not a child element)
+    if (!zone.contains(e.relatedTarget)) {
+      zone.classList.remove('dragover');
+    }
+  });
+
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    zone.classList.remove('dragover');
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('image/') || isHeic(file)) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        document.getElementById('sticker-input-library').files = dt.files;
+        onStickerUpload({ target: { files: dt.files } });
+      } else {
+        showToast('Please drop an image file (JPG, PNG, or HEIC)');
+      }
+    }
+  });
+
+  // Also allow dropping anywhere on the page as a convenience
+  document.addEventListener('dragover', (e) => e.preventDefault());
+  document.addEventListener('drop', (e) => e.preventDefault());
+})();
+
+// ── Hospital select ────────────────────────────────────────────────────────
+
+function onHospitalSelect() {
+  document.getElementById('f-custnum').value = document.getElementById('f-hospital').value;
+  updateFilename();
+}
+
+// ── Filename ───────────────────────────────────────────────────────────────
+
+let dlUrl = null, stickerDataUrl = null;
+
+function slugify(s){ return (s||'').trim().replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'').substring(0,30); }
+
+function buildFilename() {
+  const date = (document.getElementById('f-date').value.trim()||'MMDDYYYY').replace(/\//g,'-');
+  const surgeon = slugify(document.getElementById('f-surgeon').value)||'Surgeon';
+  const proc = slugify(document.getElementById('f-procedure').value)||'Procedure';
+  const initials = document.getElementById('f-initials').value.trim().toUpperCase()||'XX';
+  return `${date}_${surgeon}_${proc}_${initials}.xlsx`;
+}
+
+function updateFilename() {
+  document.getElementById('filename-preview').textContent = buildFilename();
+}
+
+// ── Crop modal engine ──────────────────────────────────────────────────────
+
+const crop = {
+  canvas: null, ctx: null, img: null,
+  scale: 1,            // canvas CSS px per image px
+  box: { x:0, y:0, w:0, h:0 },   // in image coords
+  drag: null,          // { type, startX, startY, origBox }
+  HANDLE: 18,          // handle hit size in canvas px
+};
+
+function openCropModal(e) {
+  e.stopPropagation();
+  if (!stickerDataUrl) return;
+
+  const modal = document.getElementById('crop-modal');
+  modal.style.display = 'flex';
+
+  const img = new Image();
+  img.onload = function() {
+    crop.img = img;
+    const container = document.getElementById('crop-container');
+    const maxW = container.clientWidth || 520;
+    const maxH = Math.min(window.innerHeight * 0.55, 420);
+    crop.scale = Math.min(maxW / img.width, maxH / img.height);
+
+    const cw = Math.round(img.width  * crop.scale);
+    const ch = Math.round(img.height * crop.scale);
+
+    const canvas = document.getElementById('crop-canvas');
+    canvas.width  = img.width;
+    canvas.height = img.height;
+    canvas.style.width  = cw + 'px';
+    canvas.style.height = ch + 'px';
+    crop.canvas = canvas;
+    crop.ctx    = canvas.getContext('2d');
+
+    // Default crop box: center 70% of image
+    const pad = 0.15;
+    crop.box = {
+      x: Math.round(img.width  * pad),
+      y: Math.round(img.height * pad),
+      w: Math.round(img.width  * (1 - pad*2)),
+      h: Math.round(img.height * (1 - pad*2)),
+    };
+
+    drawCrop();
+    attachCropEvents(canvas);
+  };
+  img.src = stickerDataUrl;
+}
+
+function drawCrop() {
+  const { ctx, img, box } = crop;
+  const W = img.width, H = img.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(img, 0, 0, W, H);
+
+  // Dim outside crop
+  ctx.fillStyle = 'rgba(0,0,0,0.52)';
+  ctx.fillRect(0,       0,       W,       box.y);
+  ctx.fillRect(0,       box.y,   box.x,   box.h);
+  ctx.fillRect(box.x+box.w, box.y, W-(box.x+box.w), box.h);
+  ctx.fillRect(0,       box.y+box.h, W,  H-(box.y+box.h));
+
+  // Crop border
+  ctx.strokeStyle = '#1D9E75';
+  ctx.lineWidth = Math.max(2, 3 / crop.scale);
+  ctx.strokeRect(box.x, box.y, box.w, box.h);
+
+  // Rule-of-thirds grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = Math.max(1, 1 / crop.scale);
+  for (let i=1;i<3;i++) {
+    ctx.beginPath(); ctx.moveTo(box.x + box.w*i/3, box.y); ctx.lineTo(box.x + box.w*i/3, box.y+box.h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(box.x, box.y + box.h*i/3); ctx.lineTo(box.x+box.w, box.y + box.h*i/3); ctx.stroke();
+  }
+
+  // Corner handles
+  const hs = Math.max(8, crop.HANDLE / crop.scale);
+  ctx.fillStyle = '#1D9E75';
+  const corners = [
+    [box.x, box.y], [box.x+box.w, box.y],
+    [box.x, box.y+box.h], [box.x+box.w, box.y+box.h]
+  ];
+  corners.forEach(([cx,cy]) => {
+    ctx.fillRect(cx - hs/2, cy - hs/2, hs, hs);
+  });
+
+  // Edge handles (mid points)
+  ctx.fillStyle = 'rgba(29,158,117,0.7)';
+  const mids = [
+    [box.x + box.w/2, box.y], [box.x + box.w/2, box.y+box.h],
+    [box.x, box.y + box.h/2], [box.x+box.w, box.y + box.h/2],
+  ];
+  mids.forEach(([cx,cy]) => {
+    ctx.fillRect(cx - hs/2, cy - hs/2, hs, hs);
+  });
+}
+
+function getCanvasPos(canvas, e) {
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches?.[0] || e;
+  const cssX = (touch.clientX - rect.left);
+  const cssY = (touch.clientY - rect.top);
+  // Convert CSS px → image px
+  return {
+    x: cssX / crop.scale,
+    y: cssY / crop.scale,
+  };
+}
+
+function hitTest(px, py) {
+  const { box } = crop;
+  const hs = Math.max(8, crop.HANDLE / crop.scale);
+  const corners = [
+    { name:'nw', x:box.x,       y:box.y       },
+    { name:'ne', x:box.x+box.w, y:box.y       },
+    { name:'sw', x:box.x,       y:box.y+box.h },
+    { name:'se', x:box.x+box.w, y:box.y+box.h },
+    { name:'n',  x:box.x+box.w/2, y:box.y       },
+    { name:'s',  x:box.x+box.w/2, y:box.y+box.h },
+    { name:'w',  x:box.x,         y:box.y+box.h/2 },
+    { name:'e',  x:box.x+box.w,   y:box.y+box.h/2 },
+  ];
+  for (const c of corners) {
+    if (Math.abs(px-c.x) < hs && Math.abs(py-c.y) < hs) return c.name;
+  }
+  if (px > box.x && px < box.x+box.w && py > box.y && py < box.y+box.h) return 'move';
+  return null;
+}
+
+function attachCropEvents(canvas) {
+  // Remove old listeners by replacing canvas clone
+  const fresh = canvas.cloneNode(true);
+  canvas.parentNode.replaceChild(fresh, canvas);
+  crop.canvas = fresh;
+  crop.ctx    = fresh.getContext('2d');
+  drawCrop();
+
+  function onStart(e) {
+    e.preventDefault();
+    const pos = getCanvasPos(fresh, e);
+    const hit = hitTest(pos.x, pos.y);
+    if (!hit) return;
+    crop.drag = { type: hit, startX: pos.x, startY: pos.y, origBox: { ...crop.box } };
+  }
+
+  function onMove(e) {
+    e.preventDefault();
+    if (!crop.drag) return;
+    const pos  = getCanvasPos(fresh, e);
+    const dx   = pos.x - crop.drag.startX;
+    const dy   = pos.y - crop.drag.startY;
+    const orig = crop.drag.origBox;
+    const W    = crop.img.width, H = crop.img.height;
+    const MIN  = 40;
+    let { x, y, w, h } = orig;
+
+    const t = crop.drag.type;
+    if (t === 'move') {
+      x = Math.max(0, Math.min(W-w, orig.x + dx));
+      y = Math.max(0, Math.min(H-h, orig.y + dy));
+    } else {
+      if (t.includes('e')) { w = Math.max(MIN, Math.min(W-x, orig.w + dx)); }
+      if (t.includes('w')) { const nw=Math.max(MIN, orig.w - dx); x=Math.min(orig.x+orig.w-MIN, orig.x+dx); w=nw; x=Math.max(0,x); }
+      if (t.includes('s')) { h = Math.max(MIN, Math.min(H-y, orig.h + dy)); }
+      if (t.includes('n')) { const nh=Math.max(MIN, orig.h - dy); y=Math.min(orig.y+orig.h-MIN, orig.y+dy); h=nh; y=Math.max(0,y); }
+    }
+    crop.box = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
+    drawCrop();
+  }
+
+  function onEnd(e) { e.preventDefault(); crop.drag = null; }
+
+  fresh.addEventListener('mousedown',  onStart);
+  fresh.addEventListener('mousemove',  onMove);
+  fresh.addEventListener('mouseup',    onEnd);
+  fresh.addEventListener('touchstart', onStart, { passive:false });
+  fresh.addEventListener('touchmove',  onMove,  { passive:false });
+  fresh.addEventListener('touchend',   onEnd,   { passive:false });
+}
+
+function applyCrop() {
+  const { img, box } = crop;
+  if (!img) return;
+
+  // Render cropped region to a new canvas at full resolution
+  const out = document.createElement('canvas');
+  out.width  = box.w;
+  out.height = box.h;
+  out.getContext('2d').drawImage(img, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+
+  stickerDataUrl = out.toDataURL('image/jpeg', 0.92);
+
+  // Update preview thumbnail
+  document.getElementById('sticker-img').src = stickerDataUrl;
+
+  closeCropModal();
+
+  // Re-run AI on the cropped image
+  resetAIState();
+  extractPatientInfo(stickerDataUrl);
+}
+
+function cancelCrop() { closeCropModal(); }
+
+function closeCropModal() {
+  document.getElementById('crop-modal').style.display = 'none';
+}
+
+function resetAIState() {
+  document.getElementById('ai-status').style.display = 'block';
+  document.getElementById('ai-spinner').style.display = 'inline-block';
+  document.getElementById('ai-status-text').textContent = 'Reading sticker with AI…';
+  document.getElementById('ai-extracted-badge').style.display = 'none';
+  document.getElementById('ai-note').style.display = 'none';
+  ['p-first','p-last','p-dob','p-fin'].forEach(id => { document.getElementById(id).value = ''; });
+  document.querySelectorAll('input[name="p-sex"]').forEach(r => r.checked = false);
+}
+
+// ── Mobile detection & camera support ─────────────────────────────────────
+
+(function detectMobile() {
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (!isMobile) {
+    // On desktop, hide the "Take photo" camera button since desktop browsers
+    // don't have a camera capture option — only show "Choose photo"
+    const cameraBtn = document.querySelector('#sticker-mobile-btns button:first-child');
+    if (cameraBtn) cameraBtn.style.display = 'none';
+  }
+})();
+
+function onStickerZoneClick(e) {
+  // Don't trigger if clicking the buttons inside
+  if (e.target.tagName === 'BUTTON') return;
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    // On mobile with no button click, open camera
+    document.getElementById('sticker-input').click();
+  } else {
+    // On desktop, open file browser (no camera capture)
+    document.getElementById('sticker-input-library').click();
+  }
+}
+
+function openCamera(e) {
+  e.stopPropagation();
+  document.getElementById('sticker-input').click(); // has capture="environment"
+}
+
+function openLibrary(e) {
+  e.stopPropagation();
+  document.getElementById('sticker-input-library').click(); // no capture, opens library
+}
+
+// ── Sticker upload ─────────────────────────────────────────────────────────
+
+function isHeic(file) {
+  const n=file.name.toLowerCase(), t=file.type.toLowerCase();
+  return n.endsWith('.heic')||n.endsWith('.heif')||t.includes('heic')||t.includes('heif');
+}
+
+async function onStickerUpload(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const badge = document.getElementById('sticker-badge');
+  const nameEl = document.getElementById('sticker-name');
+  document.getElementById('sticker-placeholder').style.display = 'none';
+  document.getElementById('sticker-preview').classList.add('show');
+  document.getElementById('sticker-zone').classList.add('active');
+  badge.className = 'badge badge-amber';
+  badge.textContent = isHeic(file) ? 'Converting HEIF…' : 'Loading…';
+  nameEl.textContent = file.name.length>22 ? file.name.substring(0,20)+'…' : file.name;
+  try {
+    if (isHeic(file)) {
+      const converted = await heic2any({blob:file, toType:'image/jpeg', quality:0.92});
+      const blob = Array.isArray(converted) ? converted[0] : converted;
+      stickerDataUrl = await blobToDataUrl(blob);
+    } else {
+      stickerDataUrl = await blobToDataUrl(file);
+    }
+    document.getElementById('sticker-img').src = stickerDataUrl;
+    badge.className = 'badge badge-green';
+    badge.textContent = isHeic(file) ? 'HEIF converted — crop if needed' : 'Loaded — crop if needed';
+
+    // Open crop modal automatically so user can isolate the sticker
+    // Small delay to let the UI settle first
+    setTimeout(() => openCropModal({ stopPropagation: ()=>{} }), 300);
+
+  } catch(err) {
+    badge.className = 'badge badge-amber'; badge.textContent = 'Error'; stickerDataUrl = null;
+  }
+}
+
+async function extractPatientInfo(dataUrl) {
+  document.getElementById('ai-status').style.display = 'block';
+  document.getElementById('ai-status-text').textContent = 'Reading sticker with AI…';
+  document.getElementById('patient-fields').style.display = 'block';
+
+  try {
+    const base64 = dataUrl.split(',')[1];
+    const mediaType = dataUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+
+    const response = await fetch('/.netlify/functions/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 500,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: mediaType, data: base64 }
+            },
+            {
+              type: 'text',
+              text: `This is a hospital patient ID sticker. Extract the following information and return ONLY valid JSON with no markdown, no explanation, no extra text:
+
+{
+  "first_name": "patient first name or null",
+  "last_name": "patient last name or null",
+  "dob": "date of birth in MM/DD/YYYY format or null",
+  "sex": "M or F or null",
+  "fin": "FIN number if present or null",
+  "mrn": "MRN number if present or null",
+  "notes": "any uncertainty or multiple values found, or null"
+}
+
+If a field is not visible or legible, use null. For sex, look for M/F, Male/Female, or gender indicators. For FIN and MRN, look for those exact labels or similar patient reference numbers.`
+            }
+          ]
+        }]
+      })
+    });
+
+    const data = await response.json();
+    const raw = data.content?.map(b => b.text||'').join('') || '';
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+
+    // Populate fields
+    if (parsed.first_name) document.getElementById('p-first').value = parsed.first_name;
+    if (parsed.last_name)  document.getElementById('p-last').value  = parsed.last_name;
+    if (parsed.dob)        document.getElementById('p-dob').value   = parsed.dob;
+    if (parsed.sex === 'M') document.getElementById('p-sex-m').checked = true;
+    if (parsed.sex === 'F') document.getElementById('p-sex-f').checked = true;
+
+    // Combine FIN and MRN into one field
+    const finMrn = [
+      parsed.fin ? `FIN: ${parsed.fin}` : null,
+      parsed.mrn ? `MRN: ${parsed.mrn}` : null,
+    ].filter(Boolean).join('  |  ');
+    if (finMrn) document.getElementById('p-fin').value = finMrn;
+
+    // Show notes if any
+    if (parsed.notes) {
+      document.getElementById('ai-note').style.display = 'block';
+      document.getElementById('ai-note').textContent = `⚠ Note: ${parsed.notes}`;
+    }
+
+    // Update status
+    document.getElementById('ai-status-text').textContent = 'Patient info extracted — review and correct if needed';
+    document.getElementById('ai-spinner').style.display = 'none';
+    document.getElementById('ai-extracted-badge').style.display = 'inline-block';
+
+    // Update filename initials from last name if not already set
+    const initialsField = document.getElementById('f-initials');
+    if (!initialsField.value && parsed.first_name && parsed.last_name) {
+      initialsField.value = (parsed.first_name[0] + parsed.last_name[0]).toUpperCase();
+      updateFilename();
+    }
+
+  } catch(err) {
+    const msg = err?.message || String(err);
+    document.getElementById('ai-status-text').textContent = `Error: ${msg} — check your API key in Notepad and try again.`;
+    document.getElementById('ai-spinner').style.display = 'none';
+    document.getElementById('patient-fields').style.display = 'block';
+    console.error('AI extraction error:', err);
+  }
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(blob); });
+}
+
+function removeSticker(e) {
+  e.stopPropagation(); stickerDataUrl = null;
+  document.getElementById('sticker-input').value = '';
+  document.getElementById('sticker-img').src = '';
+  document.getElementById('sticker-placeholder').style.display = '';
+  document.getElementById('sticker-preview').classList.remove('show');
+  document.getElementById('sticker-zone').classList.remove('active');
+  document.getElementById('ai-status').style.display = 'none';
+  document.getElementById('patient-fields').style.display = 'none';
+  document.getElementById('ai-note').style.display = 'none';
+  document.getElementById('ai-extracted-badge').style.display = 'none';
+  document.getElementById('ai-spinner').style.display = 'inline-block';
+  ['p-first','p-last','p-dob','p-fin'].forEach(id => document.getElementById(id).value = '');
+  document.querySelectorAll('input[name="p-sex"]').forEach(r => r.checked = false);
+}
+
+// ── Implant rows ───────────────────────────────────────────────────────────
+
+function addRow(cat='',qty='',lot='',desc='',price='') {
+  const c = document.getElementById('implant-rows');
+  const d = document.createElement('div'); d.className = 'implant-row';
+  d.innerHTML = `
+    <input class="r-cat" placeholder="CAT-001" value="${cat}" />
+    <input class="r-qty qty" type="number" min="1" placeholder="1" value="${qty}" />
+    <input class="r-lot" placeholder="LOT-XXXX" value="${lot}" />
+    <input class="r-desc" placeholder="Description" value="${desc}" />
+    <input class="r-price price" type="number" step="0.01" placeholder="0.00" value="${price}" />
+    <button class="row-remove" onclick="removeRow(this)" title="Remove">×</button>
+  `;
+  c.appendChild(d); updateCount();
+}
+
+function removeRow(btn) { btn.closest('.implant-row').remove(); updateCount(); }
+
+function updateCount() {
+  const n = document.querySelectorAll('.implant-row').length;
+  document.getElementById('row-count').textContent = n ? `${n} of 20 rows used` : '';
+}
+
+function getImplants() {
+  return Array.from(document.querySelectorAll('.implant-row')).map(r=>({
+    catalog: r.querySelector('.r-cat').value.trim(),
+    qty: parseFloat(r.querySelector('.r-qty').value)||'',
+    lot: r.querySelector('.r-lot').value.trim(),
+    description: r.querySelector('.r-desc').value.trim(),
+    price: parseFloat(r.querySelector('.r-price').value)||'',
+  })).filter(r=>r.catalog||r.description);
+}
+
+function getFields() {
+  const sel = document.getElementById('f-hospital');
+  const hospitalName = sel.selectedIndex > 0 ? sel.options[sel.selectedIndex].text : '';
+  const sexRadio = document.querySelector('input[name="p-sex"]:checked');
+  return {
+    customer_num: document.getElementById('f-custnum').value.trim(),
+    customer_name: hospitalName,
+    surgery_num: document.getElementById('f-surgnum').value.trim(),
+    date: document.getElementById('f-date').value.trim(),
+    surgeon: document.getElementById('f-surgeon').value||'',
+    procedure: document.getElementById('f-procedure').value||'',
+    initials: document.getElementById('f-initials').value.trim().toUpperCase(),
+    po_num: document.getElementById('f-po').value.trim(),
+    billing_order: document.getElementById('f-billing').value.trim(),
+    entered_by: document.getElementById('f-enteredby').value||'',
+    // Patient info from sticker
+    patient: {
+      first_name: document.getElementById('p-first').value.trim(),
+      last_name:  document.getElementById('p-last').value.trim(),
+      dob:        document.getElementById('p-dob').value.trim(),
+      sex:        sexRadio ? sexRadio.value : '',
+      fin_mrn:    document.getElementById('p-fin').value.trim(),
+    }
+  };
+}
+
+// ── Save & Email / Load from code ─────────────────────────────────────────
+
+function saveAndEmail() {
+  const f = getFields();
+  const implants = getImplants();
+
+  // Build full case snapshot — everything except the sticker image (too large for email)
+  const snapshot = {
+    v: 1,                     // version for future compatibility
+    savedAt: new Date().toISOString(),
+    fields: f,
+    implants: implants,
+    patient: f.patient,
+  };
+
+  // Encode as base64 so it survives email clients mangling text
+  const json = JSON.stringify(snapshot);
+  const encoded = btoa(unescape(encodeURIComponent(json)));
+
+  // Build readable summary for email body
+  const surgeonLine  = f.surgeon    ? `Surgeon: ${f.surgeon}`         : '';
+  const hospitalLine = f.customer_name ? `Hospital: ${f.customer_name}` : '';
+  const dateLine     = f.date       ? `Date: ${f.date}`               : '';
+  const surgNumLine  = f.surgery_num ? `Surgery #: ${f.surgery_num}`  : '';
+  const patientLine  = f.patient?.first_name
+    ? `Patient: ${f.patient.first_name} ${f.patient.last_name}`
+    : '';
+  const implantLines = implants.length
+    ? implants.map(i => `  • ${i.catalog}  ×${i.qty||1}${i.lot ? '  Lot: '+i.lot : ''}`).join('\n')
+    : '  (no implants yet)';
+
+  const body = [
+    'LUC Case Data — open LUC Implant Logger on your laptop and paste the code below into the "Load from Email" box.',
+    '',
+    '── Case summary ──',
+    hospitalLine, surgeonLine, dateLine, surgNumLine, patientLine,
+    '',
+    'Implants:',
+    implantLines,
+    '',
+    '── Case code (paste this) ──',
+    encoded,
+    '',
+    '(Do not edit the case code — paste it exactly as-is)',
+  ].filter(l => l !== undefined).join('\n');
+
+  const email     = document.getElementById('transfer-email').value.trim() || 'clayross100@gmail.com';
+  const subject   = encodeURIComponent(`LUC Case${f.surgery_num ? ' '+f.surgery_num : ''}${f.date ? ' · '+f.date : ''}`);
+  const bodyEnc   = encodeURIComponent(body);
+
+  // Open default mail app with pre-filled email
+  window.location.href = `mailto:${email}?subject=${subject}&body=${bodyEnc}`;
+  showToast('Opening mail app…');
+}
+
+function loadFromCode() {
+  const raw = document.getElementById('transfer-paste').value.trim();
+  if (!raw) { showToast('Paste a case code first'); return; }
+
+  try {
+    const json     = decodeURIComponent(escape(atob(raw)));
+    const snapshot = JSON.parse(json);
+    if (!snapshot.fields) throw new Error('Invalid case code');
+
+    const f = snapshot.fields;
+    const p = snapshot.patient || f.patient || {};
+
+    // Populate procedure fields
+    if (f.customer_num)  document.getElementById('f-custnum').value  = f.customer_num;
+    if (f.customer_name) {
+      const sel = document.getElementById('f-hospital');
+      Array.from(sel.options).forEach(o => { if (o.text === f.customer_name) sel.value = o.value; });
+    }
+    if (f.surgery_num)   document.getElementById('f-surgnum').value  = f.surgery_num;
+    if (f.date)          document.getElementById('f-date').value     = f.date;
+    if (f.surgeon) {
+      const surgSel = document.getElementById('f-surgeon');
+      Array.from(surgSel.options).forEach(o => { if (o.value === f.surgeon) surgSel.value = f.surgeon; });
+    }
+    if (f.procedure)     document.getElementById('f-procedure').value = f.procedure;
+    if (f.initials)      document.getElementById('f-initials').value = f.initials;
+    if (f.po_num)        document.getElementById('f-po').value       = f.po_num;
+    if (f.billing_order) document.getElementById('f-billing').value  = f.billing_order;
+    if (f.entered_by)    document.getElementById('f-enteredby').value = f.entered_by;
+
+    // Populate patient fields
+    if (p.first_name || p.last_name) {
+      document.getElementById('patient-fields').style.display = 'block';
+      if (p.first_name) document.getElementById('p-first').value = p.first_name;
+      if (p.last_name)  document.getElementById('p-last').value  = p.last_name;
+      if (p.dob)        document.getElementById('p-dob').value   = p.dob;
+      if (p.fin_mrn)    document.getElementById('p-fin').value   = p.fin_mrn;
+      if (p.sex === 'M') document.getElementById('p-sex-m').checked = true;
+      if (p.sex === 'F') document.getElementById('p-sex-f').checked = true;
+      document.getElementById('ai-extracted-badge').style.display = 'inline-block';
+      document.getElementById('ai-status').style.display = 'block';
+      document.getElementById('ai-spinner').style.display = 'none';
+      document.getElementById('ai-status-text').textContent = 'Patient info loaded from iPhone ✓';
+    }
+
+    // Populate implants
+    if (snapshot.implants?.length) {
+      document.getElementById('implant-rows').innerHTML = '';
+      snapshot.implants.forEach(imp => addRow(imp.catalog, imp.qty, imp.lot, imp.description, imp.price));
+      updateCount();
+    }
+
+    updateFilename();
+    document.getElementById('transfer-paste').value = '';
+
+    const count = snapshot.implants?.length || 0;
+    const name  = p.first_name ? ` · ${p.first_name} ${p.last_name}` : '';
+    showToast(`Case loaded ✓ — ${count} implant${count!==1?'s':''}${name}`);
+
+    // Scroll to top of form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  } catch(err) {
+    showToast('Invalid case code — make sure you copied the full code');
+    console.error('Load error:', err);
+  }
+}
+
+// ── myCASE Bridge ──────────────────────────────────────────────────────────
+
+function checkExtension() {
+  // Check if extension has deposited its ID via localStorage
+  const extId = localStorage.getItem('luc_ext_id');
+  const title = document.getElementById('mycase-status-title');
+  const text = document.getElementById('mycase-status-text');
+  const btn = document.getElementById('btn-send-mycase');
+
+  // Check for prior data handshake
+  const lastSent = localStorage.getItem('luc_bridge_timestamp');
+  if (lastSent) {
+    const mins = Math.round((Date.now() - parseInt(lastSent)) / 60000);
+    title.textContent = 'Extension connected';
+    text.textContent = `Last sent ${mins < 2 ? 'just now' : mins + ' min ago'} · Open myCASE to auto-fill`;
+    btn.disabled = false;
+  } else {
+    title.textContent = 'LUC Bridge installed?';
+    text.textContent = 'Click "Send to myCASE" after filling the form. The extension will pick up the data automatically.';
+    btn.disabled = false;
+  }
+}
+
+function sendToMyCASE() {
+  const f = getFields();
+  const implants = getImplants();
+  if (!implants.length) { showToast('Add at least one implant first'); return; }
+
+  const data = { ...f, implants, sentAt: Date.now() };
+
+  // Write to localStorage — the extension's content script reads this on myCASE pages
+  try {
+    localStorage.setItem('luc_bridge_data', JSON.stringify(data));
+    localStorage.setItem('luc_bridge_timestamp', Date.now().toString());
+
+    const title = document.getElementById('mycase-status-title');
+    const text = document.getElementById('mycase-status-text');
+    title.textContent = '✓ Data sent successfully';
+    text.textContent = `${implants.length} implants ready · Now open myCASE in this browser`;
+
+    showToast(`${implants.length} implants sent to myCASE bridge`);
+
+    // Open myCASE in a new tab
+    setTimeout(() => window.open('https://mycase.us.medtronic.com', '_blank'), 800);
+
+  } catch(err) {
+    showToast('Could not send data — check browser storage settings');
+  }
+}
+
+// ── Generate LUC Excel ─────────────────────────────────────────────────────
+
+function generateLUC() {
+  const f = getFields(), implants = getImplants();
+  const finalize = (png) => buildAndDownload({...f, implants}, png);
+  if (stickerDataUrl) { resizeSticker(stickerDataUrl, finalize); } else { placeholderSticker(finalize); }
+}
+
+function resizeSticker(dataUrl, cb) {
+  const W=192, H=96, img=new Image();
+  img.onload=function(){
+    const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+    const ctx=cv.getContext('2d');
+    ctx.fillStyle='white'; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='#333'; ctx.lineWidth=2; ctx.strokeRect(1,1,W-2,H-2);
+    const p=4, sc=Math.min((W-p*2)/img.width,(H-p*2)/img.height);
+    const sw=img.width*sc, sh=img.height*sc;
+    ctx.drawImage(img,(W-sw)/2,(H-sh)/2,sw,sh);
+    cb(cv.toDataURL('image/png'));
+  };
+  img.src=dataUrl;
+}
+
+function placeholderSticker(cb) {
+  const cv=document.createElement('canvas'); cv.width=192; cv.height=96;
+  const ctx=cv.getContext('2d');
+  ctx.fillStyle='white'; ctx.fillRect(0,0,192,96);
+  ctx.strokeStyle='#aaa'; ctx.lineWidth=1.5; ctx.setLineDash([6,4]);
+  ctx.strokeRect(2,2,188,92); ctx.setLineDash([]);
+  ctx.fillStyle='#bbb'; ctx.font='13px sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('Place Sticker Here',96,48);
+  cb(cv.toDataURL('image/png'));
+}
+
+function buildAndDownload(d, stickerPng) {
+  const implants = d.implants||[], fname = buildFilename();
+  const ws_data = [
+    ['','Loaner Usage Confirmation (LUC) Form','','','','','','','','','','','','','','',''],
+    ['','','','','','','','','','','','','S T A T U S','','','','          Check                    if Non-Use'],
+    ['','Customer #','','','','','Customer Name/State','','','','','','','','','',''],
+    ['',d.customer_num||'','','','','',d.customer_name||'','','','','','','','','','',''],
+    ['','Surgery #','','','','','Date','','','','','','Surgeon','','','',''],
+    ['',d.surgery_num||'','','','','',d.date||'','','','','','','','','',d.surgeon||'',''],
+    ['','Usage Entry Item #','','','Qty','','Lot #','','Item Description','','','','','','Price','','Extended Price'],
+  ];
+  for (let i=0;i<20;i++) {
+    const imp=implants[i]||{};
+    ws_data.push(['',imp.catalog||'','','',imp.qty||'','',imp.lot||'','',imp.description||'','','','','','',imp.price||'','',(imp.qty&&imp.price)?imp.qty*imp.price:'']);
+  }
+  ws_data.push(['','By signing below, the Hospital Representative is only acknowledging the type and quantity of products used in the above surgery.','','','','','','','','','','','','','Shipping and Handling','','']);
+  ws_data.push(['','OR Signature:','','','','','','','','','','','Date:','','Surgery Total','','=SUM(Q8:Q27)']);
+  ws_data.push(['','Sales Rep','','','','','Sales Rep Signature','','','','','','','','Date','','']);
+  ws_data.push(['','Clayton Ross','','','','','','','','','','','','','','','']);
+  ws_data.push(['','FOR INTERNAL USE ONLY','','','','','','','','','','',`PO #: ${d.po_num||''}`, '','','','']);
+  ws_data.push(['','Billing Order #','','',d.billing_order||'','','Entered by','','',d.entered_by||'','','','','','','','']);
+  ws_data.push(['','Please see package insert for the complete list of indications, warnings, precautions and other important medical information','','','','','','','','','','','','','','','']);
+  ws_data.push(['','PLEASE FAX TO CUSTOMER SUPPORT DEPARTMENT AT 1-800-468-9720','','','','','','','','','','','','','','','']);
+  ws_data.push(['','','','','','','','','','','','','','','','','']);
+  ws_data.push(['','','','','','','','','','','','','','','','','']);
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+  ws['!cols'] = [{wch:2},{wch:14},{wch:5},{wch:1},{wch:6},{wch:1},{wch:14},{wch:1},{wch:12},{wch:2},{wch:8},{wch:8},{wch:10},{wch:1},{wch:11},{wch:1},{wch:13}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+  const blob = new Blob([wbout], {type:'application/octet-stream'});
+  if (dlUrl) URL.revokeObjectURL(dlUrl);
+  dlUrl = URL.createObjectURL(blob);
+
+  document.getElementById('dl-filename').textContent = fname;
+  document.getElementById('dl-btn').onclick = () => {
+    const a = document.createElement('a'); a.href=dlUrl; a.download=fname; a.click();
+  };
+  document.getElementById('output-portal').classList.remove('show');
+  document.getElementById('output-luc').classList.add('show');
+  document.getElementById('output-luc').scrollIntoView({behavior:'smooth', block:'nearest'});
+  showToast(stickerDataUrl ? 'LUC ready · sticker included' : 'LUC ready · placeholder sticker added');
+}
+
+// ── Portal summary ─────────────────────────────────────────────────────────
+
+function showPortal() {
+  const f = getFields(), implants = getImplants();
+  let html = '';
+  const row = (label, val) => val ? `<div class="portal-row"><span class="portal-label">${label}</span><span class="portal-val">${val}</span></div>` : '';
+  html += row('Customer', f.customer_name);
+  html += row('Customer #', f.customer_num);
+  html += row('Surgery #', f.surgery_num);
+  html += row('Date', f.date);
+  html += row('Surgeon', f.surgeon);
+  html += row('Procedure', f.procedure);
+  if (implants.length) {
+    implants.forEach(r => {
+      html += `<div class="portal-row"><span class="portal-label">${r.catalog}${r.description?' — '+r.description:''}</span><span class="portal-val">×${r.qty||1}</span></div>`;
+    });
+  }
+  document.getElementById('portal-content').innerHTML = html || '<div style="padding:12px;color:var(--text-faint);font-size:12px;">No data entered yet</div>';
+  document.getElementById('output-luc').classList.remove('show');
+  document.getElementById('output-portal').classList.add('show');
+  document.getElementById('output-portal').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function copyPortal() {
+  const f = getFields(), implants = getImplants();
+  let text = `Customer: ${f.customer_name} (${f.customer_num})\nSurgery #: ${f.surgery_num}\nDate: ${f.date}\nSurgeon: ${f.surgeon}\nProcedure: ${f.procedure}\n\nImplants:\n`;
+  implants.forEach(r => { text += `${r.catalog}  ${r.description}  x${r.qty||1}  ${r.lot}\n`; });
+  navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'));
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
